@@ -349,11 +349,10 @@ MAIN:
 			// Process the record
 			taskRecord := NewTaskRecord(record)
 			if err := t.process(taskRecord); err != nil {
-				// Ignored recodes (due to a processing error) cannot be retried
-				if !record.ignore {
-					if err := t.commitBuffer.Add(taskRecord); err != nil {
-						t.options.failedMessageHandler(err, record)
-					}
+				// Ignored records (due to a processing error) cannot be retried, but their offset
+				// still needs to be committed
+				if err := t.commitBuffer.Add(taskRecord); err != nil {
+					t.options.failedMessageHandler(err, record)
 				}
 
 				t.reProcessCommitBuffer(err, nil)
@@ -399,6 +398,9 @@ func (t *task) reProcessCommitBuffer(err error, records []*Record) {
 
 	for _, record := range records {
 		if record.ignore {
+			if err := t.commitBuffer.Add(record); err != nil {
+				t.options.failedMessageHandler(err, record)
+			}
 			continue
 		}
 
